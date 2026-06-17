@@ -49,6 +49,10 @@ dependencies {
 	modImplementation("net.fabricmc:fabric-loader:${loader_version}")
 	modImplementation("net.fabricmc.fabric-api:fabric-api:$fabricApiVersion")
 	modRuntimeOnly("maven.modrinth:modmenu:$modmenuVersion")
+
+	// Xaero's Minimap — compile-only soft dependency for the optional minimap waypoint integration.
+	// Version pinned to what XaeroPlus uses for 1.21.4; not bundled, guarded by isModLoaded("xaerominimap").
+	modCompileOnly("maven.modrinth:xaeros-minimap:fabric-$minecraft_version-26.1.0") { isTransitive = false }
 }
 
 tasks {

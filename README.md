@@ -31,9 +31,17 @@ format (kept byte-identical on both sides).
 - `/proxybridge swap` — send `/swap` to the proxy.
 - `/proxybridge pull` — send the configured pull command (default `pearlplus pull`).
 - `/proxybridge cmd <command…>` — send any command to the proxy.
-- `/proxybridge hud <true|false>` / `boxes <true|false>` — toggle rendering.
+- `/proxybridge hud <true|false>` / `boxes <true|false>` — toggle the built-in overlay.
+- `/proxybridge xaero <true|false>` — mirror waypoints into Xaero's Minimap (a "ProxyBridge" set).
 
-Config: `config/proxybridge.json` (render toggles, max HUD entries, the swap/pull command strings).
+Config: `config/proxybridge.json` (render toggles, `useXaero`, max HUD entries, the swap/pull command strings).
+
+## Xaero's Minimap
+
+If **Xaero's Minimap** (or XaeroPlus) is installed, bridged waypoints are also mirrored into a dedicated
+"ProxyBridge" waypoint set so they show as real minimap waypoints — not just the built-in in-world boxes/HUD.
+This is a compile-only soft dependency (`modCompileOnly`, pinned to xaeros-minimap 26.1.0 for 1.21.4, the same
+version XaeroPlus uses); it's fully guarded by `isModLoaded("xaerominimap")` and never breaks the mod if absent.
 
 ## Build
 

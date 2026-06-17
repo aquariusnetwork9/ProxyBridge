@@ -19,6 +19,8 @@ public class Config {
     public boolean renderWorldBoxes = true;
     /** Draw the on-screen list of waypoints (name + distance + coords). */
     public boolean renderHud = true;
+    /** Mirror waypoints into Xaero's Minimap (a "ProxyBridge" set) when that mod is installed. */
+    public boolean useXaero = true;
     /** Max waypoints shown in the HUD list. */
     public int maxHudEntries = 12;
     /** Proxy command sent by {@code /proxybridge pull} (the stasis-pull side). */

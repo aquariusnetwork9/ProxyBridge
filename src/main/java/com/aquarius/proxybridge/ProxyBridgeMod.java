@@ -58,6 +58,7 @@ public class ProxyBridgeMod implements ClientModInitializer {
         config = Config.load();
         BridgeNetworking.init();
         WaypointRenderer.init();
+        com.aquarius.proxybridge.xaero.XaeroWaypointSync.init();
         registerCommands();
         LOG.info("ProxyBridge initialized");
     }
@@ -99,6 +100,12 @@ public class ProxyBridgeMod implements ClientModInitializer {
                     config.renderWorldBoxes = getBool(c, "enabled");
                     config.save();
                     c.getSource().sendFeedback(Component.literal("World boxes: " + config.renderWorldBoxes));
+                    return 1;
+                })))
+                .then(literal("xaero").then(argument("enabled", bool()).executes(c -> {
+                    config.useXaero = getBool(c, "enabled");
+                    config.save();
+                    c.getSource().sendFeedback(Component.literal("Xaero's Minimap waypoints: " + config.useXaero));
                     return 1;
                 }))));
             dispatcher.register(literal("pb").redirect(root));

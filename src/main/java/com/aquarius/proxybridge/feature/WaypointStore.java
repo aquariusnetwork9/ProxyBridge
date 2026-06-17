@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Holds the waypoints currently published by the proxy, keyed by group then waypoint id. Thread-safe: the network
@@ -14,16 +15,20 @@ public final class WaypointStore {
     public static final WaypointStore INSTANCE = new WaypointStore();
 
     private final Map<String, Map<String, BridgeWaypoint>> groups = new ConcurrentHashMap<>();
+    /** Bumped on every mutation so consumers (e.g. the Xaero sync) can cheaply detect changes. */
+    private final AtomicInteger version = new AtomicInteger();
 
     public void sync(String group, List<BridgeWaypoint> waypoints) {
         Map<String, BridgeWaypoint> m = new ConcurrentHashMap<>();
         for (BridgeWaypoint wp : waypoints) m.put(wp.id(), wp);
         if (m.isEmpty()) groups.remove(group);
         else groups.put(group, m);
+        version.incrementAndGet();
     }
 
     public void upsert(String group, BridgeWaypoint wp) {
         groups.computeIfAbsent(group, g -> new ConcurrentHashMap<>()).put(wp.id(), wp);
+        version.incrementAndGet();
     }
 
     public void remove(String group, String id) {
@@ -31,15 +36,23 @@ public final class WaypointStore {
         if (m != null) {
             m.remove(id);
             if (m.isEmpty()) groups.remove(group);
+            version.incrementAndGet();
         }
     }
 
     public void clear(String group) {
-        groups.remove(group);
+        if (groups.remove(group) != null) version.incrementAndGet();
     }
 
     public void clearAll() {
-        groups.clear();
+        if (!groups.isEmpty()) {
+            groups.clear();
+            version.incrementAndGet();
+        }
+    }
+
+    public int version() {
+        return version.get();
     }
 
     /** Snapshot of all current waypoints across every group. */
