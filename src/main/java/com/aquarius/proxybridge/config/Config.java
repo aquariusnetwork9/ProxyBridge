@@ -9,6 +9,7 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.nio.file.Path;
+import java.util.ArrayList;
 
 import static com.aquarius.proxybridge.ProxyBridgeMod.LOG;
 
@@ -23,10 +24,27 @@ public class Config {
     public boolean useXaero = true;
     /** Max waypoints shown in the HUD list. */
     public int maxHudEntries = 12;
-    /** Proxy command sent by {@code /proxybridge pull} (the stasis-pull side). */
-    public String pullCommand = "pearlplus pull";
+    /** Override for {@code /proxybridge pull} (connected proxy). Blank = {@code pearlplus load <you> <you>}. */
+    public String pullCommand = "";
     /** Proxy command sent by {@code /proxybridge swap}. */
     public String swapCommand = "swap";
+
+    /** Remote pearl bots the player has access to (each gated by the owner-supplied token). */
+    public final ArrayList<PearlBot> bots = new ArrayList<>();
+
+    /**
+     * One remote pearl bot reachable via its HTTP command API.
+     * @param id      a short label the player picks, used in {@code /pb pull <id>}
+     * @param url     host[:port] of the bot's command API (http:// assumed if no scheme)
+     * @param token   the Authorization token the bot's owner shared
+     * @param pearlId pearl id to load; blank = use the player's own username
+     */
+    public static final class PearlBot {
+        public String id = "";
+        public String url = "";
+        public String token = "";
+        public String pearlId = "";
+    }
 
     public static Path configPath = FabricLoader.getInstance().getConfigDir().resolve("proxybridge.json");
 
