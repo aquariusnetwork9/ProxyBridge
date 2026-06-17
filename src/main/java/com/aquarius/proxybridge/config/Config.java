@@ -10,6 +10,7 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.List;
 
 import static com.aquarius.proxybridge.ProxyBridgeMod.LOG;
 
@@ -29,18 +30,29 @@ public class Config {
     /** Proxy command sent by {@code /proxybridge swap}. */
     public String swapCommand = "swap";
 
+    /**
+     * Reroute a whispered command to a registered bot over its HTTP API instead of sending it as in-game chat, so a
+     * chat-muted player can still drive their bot. Only fires when the whisper target matches a registered bot's IGN
+     * (or id); ordinary whispers pass through. See {@code com.aquarius.proxybridge.feature.WhisperInterceptor}.
+     */
+    public boolean interceptWhispers = true;
+    /** Command verbs treated as whispers for the intercept (matched case-insensitively, no leading slash). */
+    public final ArrayList<String> whisperVerbs = new ArrayList<>(List.of("w", "msg", "tell", "whisper", "m"));
+
     /** Remote pearl bots the player has access to (each gated by the owner-supplied token). */
     public final ArrayList<PearlBot> bots = new ArrayList<>();
 
     /**
      * One remote pearl bot reachable via its HTTP command API.
      * @param id      a short label the player picks, used in {@code /pb pull <id>}
+     * @param ign     the bot's in-game name to match whispers against (blank = match the id instead)
      * @param url     host[:port] of the bot's command API (http:// assumed if no scheme)
      * @param token   the Authorization token the bot's owner shared
      * @param pearlId pearl id to load; blank = use the player's own username
      */
     public static final class PearlBot {
         public String id = "";
+        public String ign = "";
         public String url = "";
         public String token = "";
         public String pearlId = "";

@@ -66,6 +66,7 @@ public class ProxyBridgeMod implements ClientModInitializer {
         BridgeNetworking.init();
         WaypointRenderer.init();
         com.aquarius.proxybridge.xaero.XaeroWaypointSync.init();
+        com.aquarius.proxybridge.feature.WhisperInterceptor.init();
         registerCommands();
         LOG.info("ProxyBridge initialized");
     }
@@ -115,7 +116,8 @@ public class ProxyBridgeMod implements ClientModInitializer {
                         } else {
                             c.getSource().sendFeedback(Component.literal("Pearl bots:"));
                             for (Config.PearlBot b : config.bots) {
-                                c.getSource().sendFeedback(Component.literal(" " + b.id + " -> " + b.url));
+                                String ign = (b.ign == null || b.ign.isBlank()) ? "" : "  (whisper: " + b.ign + ")";
+                                c.getSource().sendFeedback(Component.literal(" " + b.id + " -> " + b.url + ign));
                             }
                         }
                         return 1;
@@ -139,6 +141,18 @@ public class ProxyBridgeMod implements ClientModInitializer {
                         c.getSource().sendFeedback(Component.literal(removed ? "Removed bot " + id : "No bot " + id));
                         return 1;
                     })))
+                    .then(literal("ign").then(argument("id", word()).then(argument("ign", word()).executes(c -> {
+                        Config.PearlBot b = findBot(getString(c, "id"));
+                        if (b == null) {
+                            c.getSource().sendFeedback(Component.literal("No bot " + getString(c, "id")));
+                            return 0;
+                        }
+                        b.ign = getString(c, "ign");
+                        config.save();
+                        c.getSource().sendFeedback(Component.literal("Whisper IGN for " + b.id + " = " + b.ign
+                            + " (now: /w " + b.ign + " <command> reroutes to its API)"));
+                        return 1;
+                    }))))
                     .then(literal("pearlid").then(argument("id", word()).then(argument("pearlId", string()).executes(c -> {
                         Config.PearlBot b = findBot(getString(c, "id"));
                         if (b == null) {
@@ -182,6 +196,13 @@ public class ProxyBridgeMod implements ClientModInitializer {
                     config.save();
                     c.getSource().sendFeedback(Component.literal("Xaero's Minimap waypoints: " + config.useXaero));
                     return 1;
+                })))
+                .then(literal("whisper").then(argument("enabled", bool()).executes(c -> {
+                    config.interceptWhispers = getBool(c, "enabled");
+                    config.save();
+                    c.getSource().sendFeedback(Component.literal("Whisper intercept (muted-safe API reroute): "
+                        + config.interceptWhispers + " — set a bot's match name with /pb bots ign <id> <ign>"));
+                    return 1;
                 }))));
             dispatcher.register(literal("pb").redirect(root));
         });
@@ -204,16 +225,32 @@ public class ProxyBridgeMod implements ClientModInitializer {
     /** Fire a command at a remote bot's HTTP API off-thread, then report the result back in chat. */
     private static void runRemote(FabricClientCommandSource source, Config.PearlBot bot, String command) {
         ForkJoinPool.commonPool().execute(() -> {
-            String result;
-            try {
-                CommandResponse resp = WebAPI.INSTANCE.execute(command, bot.url, bot.token);
-                result = summarize(bot, resp);
-            } catch (Exception e) {
-                result = bot.id + ": error — " + e.getClass().getSimpleName() + " " + e.getMessage();
-            }
-            final String msg = result;
+            final String msg = runRemoteSync(bot, command);
             Minecraft.getInstance().execute(() -> source.sendFeedback(Component.literal(msg)));
         });
+    }
+
+    /**
+     * Fire a command at a remote bot's HTTP API off-thread, reporting the result to the local chat HUD. Used where
+     * there's no command source — notably the whisper-intercept ({@link com.aquarius.proxybridge.feature.WhisperInterceptor}).
+     */
+    public static void runRemoteToChat(Config.PearlBot bot, String command) {
+        ForkJoinPool.commonPool().execute(() -> {
+            final String msg = runRemoteSync(bot, command);
+            Minecraft.getInstance().execute(() -> {
+                var p = Minecraft.getInstance().player;
+                if (p != null) p.displayClientMessage(Component.literal(msg), false);
+            });
+        });
+    }
+
+    private static String runRemoteSync(Config.PearlBot bot, String command) {
+        try {
+            CommandResponse resp = WebAPI.INSTANCE.execute(command, bot.url, bot.token);
+            return summarize(bot, resp);
+        } catch (Exception e) {
+            return bot.id + ": error — " + e.getClass().getSimpleName() + " " + e.getMessage();
+        }
     }
 
     private static String summarize(Config.PearlBot bot, CommandResponse resp) {

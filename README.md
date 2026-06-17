@@ -42,14 +42,28 @@ You pull from **one** bot at a time.
 
 - `/pb bots add <id> <url> <token>` — register a bot (quote the url/token, e.g. `"1.2.3.4:7890"`).
 - `/pb bots list` / `/pb bots del <id>`
+- `/pb bots ign <id> <ign>` — set the bot's in-game name (used by the whisper intercept below).
 - `/pb bots pearlid <id> <pearlId>` — set the pearl id for a bot (default: your username).
 - `/pb pull <id>` — pull your pearl from that bot (`pearlplus load <you> <pearlId>`).
 - `/pb bots cmd <id> <command…>` — run any command on that bot.
 
-Requires the target bot to run a proxy that exposes the ZenithProxy-style HTTP command API (this is what the
-shared token authorizes). AquariusProxy does not yet ship that server — see the repo notes.
+Requires the target bot to run a proxy that exposes the ZenithProxy-style HTTP command API authorized by the shared
+token. AquariusProxy ships this as the RBAC **command API** (`perms api on`, localhost-bound by default — expose it
+deliberately); the token is issued per user with `perms token issue <name>` and scoped by that user's role.
 
-Config: `config/proxybridge.json` (render toggles, `useXaero`, max HUD entries, swap command, the bot list).
+### Muted? Whisper your bot anyway (whisper intercept)
+
+Normally you'd whisper a bot to pull your pearl — but if you're chat-muted, the whisper never lands. With the
+intercept on, a whisper **to a registered bot** is rerouted over that bot's HTTP API instead of in-game chat, so the
+mute doesn't matter (and the bot's RBAC role decides what your command is allowed to do).
+
+- `/w <bot-ign> <command…>` (also `msg`/`tell`/`whisper`/`m`) — if `<bot-ign>` matches a registered bot's IGN
+  (set with `/pb bots ign`), the command is sent to its API; a local line confirms the reroute. Whispers to real
+  players are untouched.
+- `/pb whisper <true|false>` — toggle the intercept (default on).
+
+Config: `config/proxybridge.json` (render toggles, `useXaero`, max HUD entries, swap command, `interceptWhispers`,
+`whisperVerbs`, the bot list — each bot has `id`, `ign`, `url`, `token`, `pearlId`).
 
 ## Xaero's Minimap
 
@@ -69,7 +83,8 @@ client and connect **through** AquariusProxy with the `Bridge` module enabled.
 
 ## Status
 
-v0.1 — first cut. Waypoints (PearlDrop empties) + swap/pull control. The renderer is intentionally simple
-(line boxes + HUD list); Xaero's/XaeroPlus minimap integration and click-to-pull are future work.
+v0.1 — first cut. Waypoints (PearlDrop empties) + swap/pull control + multi-bot remote pull + muted-safe whisper
+intercept. The renderer is intentionally simple (line boxes + HUD list); Xaero's/XaeroPlus minimap integration and
+click-to-pull are future work, as is the in-game RBAC admin GUI screen.
 
 [AquariusProxy]: https://github.com/aquariusnetwork9/AquariusProxy
