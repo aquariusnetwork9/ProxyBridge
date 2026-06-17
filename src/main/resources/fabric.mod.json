@@ -1,0 +1,22 @@
+{
+	"schemaVersion": 1,
+	"id": "proxybridge",
+	"version": "${version}",
+	"name": "ProxyBridge",
+	"description": "Live waypoints and controls bridged from AquariusProxy/ZenithProxy to the connected client.",
+	"authors": [
+		"aquariusnetwork9"
+	],
+	"license": "MIT",
+	"environment": "client",
+	"entrypoints": {
+		"client": [
+			"com.aquarius.proxybridge.ProxyBridgeMod"
+		]
+	},
+	"depends": {
+		"fabricloader": ">=0.16.2",
+		"fabric-api": "*",
+		"minecraft": ["1.21.4"]
+	}
+}
