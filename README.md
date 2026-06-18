@@ -62,6 +62,19 @@ mute doesn't matter (and the bot's RBAC role decides what your command is allowe
   players are untouched.
 - `/pb whisper <true|false>` — toggle the intercept (default on).
 
+### In-game RBAC admin screen
+
+`/pb admin [bot-id]` opens an in-game screen to administer a bot's access control (needs an **admin** token for that
+bot — `perms` is admin-only). It reads the bot's state via `perms export` (structured JSON) and drives every change
+back over the same API:
+
+- toggle RBAC + the HTTP API; refresh
+- a paginated **user table** (click to select)
+- add a user (name + role), set a selected user's **role**, toggle **capability presets** (`group.*`) as checkboxes,
+  **issue** a token (copied to your clipboard, shown once) / **revoke** one, flip **connect mode**, or **remove** them
+
+With one registered bot, `/pb admin` (no id) opens it directly.
+
 Config: `config/proxybridge.json` (render toggles, `useXaero`, max HUD entries, swap command, `interceptWhispers`,
 `whisperVerbs`, the bot list — each bot has `id`, `ign`, `url`, `token`, `pearlId`).
 
@@ -84,7 +97,7 @@ client and connect **through** AquariusProxy with the `Bridge` module enabled.
 ## Status
 
 v0.1 — first cut. Waypoints (PearlDrop empties) + swap/pull control + multi-bot remote pull + muted-safe whisper
-intercept. The renderer is intentionally simple (line boxes + HUD list); Xaero's/XaeroPlus minimap integration and
-click-to-pull are future work, as is the in-game RBAC admin GUI screen.
+intercept + in-game RBAC admin screen (`/pb admin`). The renderer is intentionally simple (line boxes + HUD list);
+Xaero's/XaeroPlus minimap integration and click-to-pull are future work. None of it is live-tested yet.
 
 [AquariusProxy]: https://github.com/aquariusnetwork9/AquariusProxy

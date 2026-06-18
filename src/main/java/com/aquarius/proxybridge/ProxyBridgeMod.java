@@ -203,7 +203,10 @@ public class ProxyBridgeMod implements ClientModInitializer {
                     c.getSource().sendFeedback(Component.literal("Whisper intercept (muted-safe API reroute): "
                         + config.interceptWhispers + " — set a bot's match name with /pb bots ign <id> <ign>"));
                     return 1;
-                }))));
+                })))
+                .then(literal("admin")
+                    .executes(c -> openAdmin(c.getSource(), null))
+                    .then(argument("bot", word()).executes(c -> openAdmin(c.getSource(), getString(c, "bot"))))));
             dispatcher.register(literal("pb").redirect(root));
         });
     }
@@ -213,6 +216,31 @@ public class ProxyBridgeMod implements ClientModInitializer {
             if (b.id.equalsIgnoreCase(id)) return b;
         }
         return null;
+    }
+
+    /** Open the in-game RBAC admin screen for a registered bot (needs an admin token for that bot). */
+    private static int openAdmin(FabricClientCommandSource source, String botId) {
+        Config.PearlBot bot;
+        if (botId == null) {
+            if (config.bots.size() == 1) {
+                bot = config.bots.get(0);
+            } else {
+                source.sendFeedback(Component.literal("Specify a bot: /pb admin <id> (you have "
+                    + config.bots.size() + " — see /pb bots list)"));
+                return 0;
+            }
+        } else {
+            bot = findBot(botId);
+            if (bot == null) {
+                source.sendFeedback(Component.literal("No bot '" + botId + "' (try /pb bots list)"));
+                return 0;
+            }
+        }
+        final Config.PearlBot fbot = bot;
+        // defer so this runs after the client closes the command chat screen
+        Minecraft.getInstance().execute(() ->
+            Minecraft.getInstance().setScreen(new com.aquarius.proxybridge.client.RbacAdminScreen(fbot)));
+        return 1;
     }
 
     /** Build the load command: {@code pearlplus load <me> <pearlId|me>}. A null bot means a self/local pull. */
