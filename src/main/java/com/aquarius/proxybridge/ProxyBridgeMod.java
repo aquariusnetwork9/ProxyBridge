@@ -7,12 +7,17 @@ import com.aquarius.proxybridge.net.BridgePayload;
 import com.aquarius.proxybridge.render.WaypointRenderer;
 import com.aquarius.proxybridge.web.CommandResponse;
 import com.aquarius.proxybridge.web.WebAPI;
+import com.mojang.blaze3d.platform.InputConstants;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
+import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,6 +42,9 @@ import static net.fabricmc.fabric.api.client.command.v2.ClientCommandManager.lit
 public class ProxyBridgeMod implements ClientModInitializer {
     public static final Logger LOG = LoggerFactory.getLogger("ProxyBridge");
     public static Config config;
+
+    /** Pull-your-pearl keybind (default unbound). Fires an instant bridge pull when connected through the proxy. */
+    private static KeyMapping pullKey;
 
     /** True if the client is connected through an Aquarius/Zenith proxy (best-effort, via the server brand). */
     public static boolean onProxyServer() {
@@ -68,7 +76,32 @@ public class ProxyBridgeMod implements ClientModInitializer {
         com.aquarius.proxybridge.xaero.XaeroWaypointSync.init();
         com.aquarius.proxybridge.feature.WhisperInterceptor.init();
         registerCommands();
+        registerKeybinds();
         LOG.info("ProxyBridge initialized");
+    }
+
+    private void registerKeybinds() {
+        pullKey = KeyBindingHelper.registerKeyBinding(new KeyMapping(
+            "key.proxybridge.pull", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN, "key.categories.proxybridge"));
+        ClientTickEvents.END_CLIENT_TICK.register(client -> {
+            while (pullKey.consumeClick()) onPullKey(client);
+        });
+    }
+
+    /** Instant default-pearl pull: the plugin channel when connected through the proxy, else the default bot's HTTP API. */
+    private static void onPullKey(Minecraft client) {
+        if (config == null) return;
+        if (config.bridgePull && BridgeNetworking.sendPearlPull("")) {
+            chat(client, "⚡ Pulling your pearl over the bridge…");
+            return;
+        }
+        Config.PearlBot bot = defaultBot();
+        if (bot != null && hasApi(bot)) {
+            chat(client, "⚡ Pulling your pearl from " + bot.id + "…");
+            runRemoteToChat(bot, remotePull(bot, null));
+            return;
+        }
+        chat(client, "No bot to pull from — add one with /pb bots add <id> <url> <token>, then bind a key (Controls → ProxyBridge).");
     }
 
     private void registerCommands() {
@@ -88,26 +121,17 @@ public class ProxyBridgeMod implements ClientModInitializer {
                     return 1;
                 }))
                 .then(literal("pull")
-                    .executes(c -> {
-                        // no bot id: pull from the proxy we're connected to
-                        String cmd = (config.pullCommand == null || config.pullCommand.isBlank())
-                            ? pullCommandFor(null) : config.pullCommand;
-                        sendProxyCommand(cmd);
-                        c.getSource().sendFeedback(Component.literal("Sent: /" + cmd));
-                        return 1;
-                    })
+                    // no bot id: pull my pearl from my default bot, best transport (channel if connected, else HTTP)
+                    .executes(c -> pullMyPearl(c.getSource(), defaultBot(), null))
                     .then(argument("bot", word()).executes(c -> {
-                        // pull from one specific remote bot we have access to
+                        // pull my pearl from one specific bot I have a token for (out in the world → over its HTTP API)
                         String botId = getString(c, "bot");
                         Config.PearlBot bot = findBot(botId);
                         if (bot == null) {
                             c.getSource().sendFeedback(Component.literal("No bot '" + botId + "' (try /pb bots list)"));
                             return 0;
                         }
-                        String command = pullCommandFor(bot);
-                        c.getSource().sendFeedback(Component.literal("Pulling your pearl from " + bot.id + "…"));
-                        runRemote(c.getSource(), bot, command);
-                        return 1;
+                        return pullMyPearl(c.getSource(), bot, null);
                     })))
                 .then(literal("bots")
                     .then(literal("list").executes(c -> {
@@ -139,6 +163,18 @@ public class ProxyBridgeMod implements ClientModInitializer {
                         boolean removed = config.bots.removeIf(b -> b.id.equalsIgnoreCase(id));
                         config.save();
                         c.getSource().sendFeedback(Component.literal(removed ? "Removed bot " + id : "No bot " + id));
+                        return 1;
+                    })))
+                    .then(literal("default").then(argument("id", word()).executes(c -> {
+                        Config.PearlBot b = findBot(getString(c, "id"));
+                        if (b == null) {
+                            c.getSource().sendFeedback(Component.literal("No bot " + getString(c, "id")));
+                            return 0;
+                        }
+                        config.defaultBotId = b.id;
+                        config.save();
+                        c.getSource().sendFeedback(Component.literal("Default pull bot = " + b.id
+                            + " (used by /pb pull and the pull keybind)"));
                         return 1;
                     })))
                     .then(literal("ign").then(argument("id", word()).then(argument("ign", word()).executes(c -> {
@@ -204,6 +240,13 @@ public class ProxyBridgeMod implements ClientModInitializer {
                         + config.interceptWhispers + " — set a bot's match name with /pb bots ign <id> <ign>"));
                     return 1;
                 })))
+                .then(literal("bridgepull").then(argument("enabled", bool()).executes(c -> {
+                    config.bridgePull = getBool(c, "enabled");
+                    config.save();
+                    c.getSource().sendFeedback(Component.literal("Bridge pearl pulls (instant, over the proxy channel): "
+                        + config.bridgePull + " — covers /pb pull, the pull keybind, and the /w <bot> load fast-path"));
+                    return 1;
+                })))
                 .then(literal("admin")
                     .executes(c -> openAdmin(c.getSource(), null))
                     .then(argument("bot", word()).executes(c -> openAdmin(c.getSource(), getString(c, "bot"))))));
@@ -243,11 +286,50 @@ public class ProxyBridgeMod implements ClientModInitializer {
         return 1;
     }
 
-    /** Build the load command: {@code pearlplus load <me> <pearlId|me>}. A null bot means a self/local pull. */
-    private static String pullCommandFor(Config.PearlBot bot) {
-        String me = Minecraft.getInstance().getUser().getName();
-        String pearlId = (bot == null || bot.pearlId == null || bot.pearlId.isBlank()) ? me : bot.pearlId;
-        return "pearlplus load " + me + " " + pearlId;
+    /**
+     * Pull MY pearl using the best available transport: the instant {@code proxybridge:main} plugin channel when I'm
+     * connected through the proxy (mostly the owner), otherwise the bot's HTTP API — {@code pearlpull}, which is
+     * self-scoped and gated by my token's {@code pearl.pull}, so it works for a player out in the world with just an
+     * IP + token. The channel attempt is a fast no-op when not connected through the proxy.
+     */
+    private static int pullMyPearl(FabricClientCommandSource source, Config.PearlBot bot, String pearlId) {
+        if (config.bridgePull && BridgeNetworking.sendPearlPull(pearlId == null ? "" : pearlId)) {
+            source.sendFeedback(Component.literal("⚡ Pulling your pearl over the bridge…"));
+            return 1;
+        }
+        if (bot != null && hasApi(bot)) {
+            source.sendFeedback(Component.literal("⚡ Pulling your pearl from " + bot.id + "…"));
+            runRemote(source, bot, remotePull(bot, pearlId));
+            return 1;
+        }
+        source.sendFeedback(Component.literal(
+            "No bot to pull from — register one with /pb bots add <id> <url> <token> (ask the bot admin for the IP + token)."));
+        return 0;
+    }
+
+    /** The HTTP pull command for a bot: self-scoped {@code pearlpull [pearlId]} (blank = your default pearl). */
+    private static String remotePull(Config.PearlBot bot, String pearlId) {
+        String id = (pearlId != null && !pearlId.isBlank()) ? pearlId
+            : (bot != null && bot.pearlId != null && !bot.pearlId.isBlank() ? bot.pearlId : "");
+        return id.isBlank() ? "pearlpull" : "pearlpull " + id;
+    }
+
+    /** Target for {@code /pb pull} (no id) + the keybind: the configured default bot, or the sole registered bot. */
+    private static Config.PearlBot defaultBot() {
+        if (config.bots.isEmpty()) return null;
+        if (config.defaultBotId != null && !config.defaultBotId.isBlank()) {
+            Config.PearlBot b = findBot(config.defaultBotId);
+            if (b != null) return b;
+        }
+        return config.bots.size() == 1 ? config.bots.get(0) : null;
+    }
+
+    private static boolean hasApi(Config.PearlBot bot) {
+        return bot != null && bot.url != null && !bot.url.isBlank() && bot.token != null && !bot.token.isBlank();
+    }
+
+    private static void chat(Minecraft client, String msg) {
+        if (client.player != null) client.player.displayClientMessage(Component.literal("[ProxyBridge] " + msg), true);
     }
 
     /** Fire a command at a remote bot's HTTP API off-thread, then report the result back in chat. */

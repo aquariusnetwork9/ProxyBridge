@@ -2,6 +2,7 @@ package com.aquarius.proxybridge.feature;
 
 import com.aquarius.proxybridge.ProxyBridgeMod;
 import com.aquarius.proxybridge.config.Config;
+import com.aquarius.proxybridge.net.BridgeNetworking;
 import net.fabricmc.fabric.api.client.message.v1.ClientSendMessageEvents;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
@@ -24,10 +25,10 @@ public final class WhisperInterceptor {
         ClientSendMessageEvents.ALLOW_COMMAND.register(WhisperInterceptor::onCommand);
     }
 
-    /** @return true to let the command reach the server, false to cancel it (we rerouted it over the API). */
+    /** @return true to let the command reach the server, false to cancel it (we rerouted it over a backend). */
     private static boolean onCommand(String command) {
         Config config = ProxyBridgeMod.config;
-        if (config == null || !config.interceptWhispers || config.bots.isEmpty()) return true;
+        if (config == null || config.bots.isEmpty()) return true;
 
         // ALLOW_COMMAND passes the command WITHOUT its leading slash; we need: <verb> <target> <message...>
         String trimmed = command.strip();
@@ -48,9 +49,36 @@ public final class WhisperInterceptor {
 
         if (message.startsWith("/")) message = message.substring(1).strip();   // tolerate "/w bot /pearlplus load …"
         if (message.isEmpty()) return true;
+
+        // Pearl-pull fast path: "<bot> load [id]" routed over the backend instead of in-game chat. Independent of
+        // interceptWhispers (it's a speed-up, not a mute bypass): the instant plugin channel first when connected
+        // through the proxy, else the bot's HTTP API ("pearlpull" — self-scoped, pearl.pull-gated). Falls through to
+        // a normal in-game whisper if neither backend is available.
+        String[] words = message.split("\\s+");
+        if (config.bridgePull && words[0].equalsIgnoreCase("load")) {
+            String pearlId = words.length >= 2 ? words[1] : "";
+            if (BridgeNetworking.sendPearlPull(pearlId)) {
+                feedback("⚡ instant pull via bridge → " + (pearlId.isBlank() ? "default pearl" : pearlId));
+                return false;
+            }
+            if (hasApi(bot)) {
+                String apiCmd = pearlId.isBlank() ? "pearlpull" : "pearlpull " + pearlId;
+                feedback("pull via " + bot.id + " API → /" + apiCmd);
+                ProxyBridgeMod.runRemoteToChat(bot, apiCmd);
+                return false;
+            }
+            return true;                                           // no backend ready — let the whisper through
+        }
+
+        // Muted-safe generic command reroute over the HTTP API (opt-in).
+        if (!config.interceptWhispers) return true;
         feedback("muted-safe: rerouting to " + bot.id + " via API → /" + message);
         ProxyBridgeMod.runRemoteToChat(bot, message);
         return false;                                             // cancel the in-game whisper
+    }
+
+    private static boolean hasApi(Config.PearlBot bot) {
+        return bot.url != null && !bot.url.isBlank() && bot.token != null && !bot.token.isBlank();
     }
 
     private static boolean isWhisperVerb(Config config, String verb) {

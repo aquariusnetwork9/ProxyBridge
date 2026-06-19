@@ -25,10 +25,18 @@ public class Config {
     public boolean useXaero = true;
     /** Max waypoints shown in the HUD list. */
     public int maxHudEntries = 12;
-    /** Override for {@code /proxybridge pull} (connected proxy). Blank = {@code pearlplus load <you> <you>}. */
-    public String pullCommand = "";
+    /**
+     * Use the instant {@code proxybridge:main} plugin channel for pearl pulls when connected through the proxy
+     * (the proxy resolves your own pearl, gated by its RBAC {@code pearl.pull}). When off, or when you're not
+     * connected through the proxy, {@code /pb pull} / the pull keybind / the {@code /w <bot> load} fast-path use the
+     * bot's HTTP API instead (the path that works for players out in the world).
+     */
+    public boolean bridgePull = true;
     /** Proxy command sent by {@code /proxybridge swap}. */
     public String swapCommand = "swap";
+    /** Which registered bot {@code /pb pull} (no id) and the pull keybind target when not connected through a proxy.
+     *  Blank + exactly one bot registered = that bot. Set with {@code /pb bots default <id>}. */
+    public String defaultBotId = "";
 
     /**
      * Reroute a whispered command to a registered bot over its HTTP API instead of sending it as in-game chat, so a

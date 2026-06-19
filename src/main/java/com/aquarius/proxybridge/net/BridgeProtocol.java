@@ -28,6 +28,8 @@ public final class BridgeProtocol {
     public static final String TOPIC_WP_REMOVE = "wp/remove";
     public static final String TOPIC_WP_CLEAR = "wp/clear";
     public static final String TOPIC_CMD_INVOKE = "cmd/invoke";
+    /** Client -> proxy: pearl pull for the connected player (self-scoped, gated by the proxy's RBAC pearl.pull). */
+    public static final String TOPIC_PEARL_PULL = "pearl/pull";
     public static final String TOPIC_TOAST = "toast";
 
     // ---- encoders (client -> proxy) ------------------------------------------------------------
@@ -45,6 +47,13 @@ public final class BridgeProtocol {
         Writer w = startMessage(TOPIC_CMD_INVOKE);
         w.writeString(name);
         w.writeString(args == null ? "" : args);
+        return w.toByteArray();
+    }
+
+    /** Client -> proxy: pearl pull. {@code pearlId} empty = the requester's default pearl. */
+    public static byte[] encodePearlPull(String pearlId) {
+        Writer w = startMessage(TOPIC_PEARL_PULL);
+        w.writeString(pearlId == null ? "" : pearlId);
         return w.toByteArray();
     }
 

@@ -20,7 +20,7 @@ import java.util.List;
 public final class BridgeNetworking {
     private BridgeNetworking() {}
 
-    public static final String MOD_VERSION = "0.1.0";
+    public static final String MOD_VERSION = "0.2.0";
 
     public static void init() {
         PayloadTypeRegistry.playS2C().register(BridgePayload.TYPE, BridgePayload.CODEC);
@@ -80,7 +80,7 @@ public final class BridgeNetworking {
 
     public static void sendHello() {
         if (!ClientPlayNetworking.canSend(BridgePayload.TYPE)) return;
-        List<String> features = List.of(BridgeProtocol.TOPIC_WP_SYNC, BridgeProtocol.TOPIC_CMD_INVOKE);
+        List<String> features = List.of(BridgeProtocol.TOPIC_WP_SYNC, BridgeProtocol.TOPIC_CMD_INVOKE, BridgeProtocol.TOPIC_PEARL_PULL);
         send(BridgeProtocol.encodeHello("client", MOD_VERSION, features));
     }
 
@@ -88,6 +88,17 @@ public final class BridgeNetworking {
     public static void sendCmdInvoke(String name, String args) {
         if (!ClientPlayNetworking.canSend(BridgePayload.TYPE)) return;
         send(BridgeProtocol.encodeCmdInvoke(name, args));
+    }
+
+    /**
+     * Instant pearl pull over the channel (self-scoped on the proxy, gated by its RBAC {@code pearl.pull}). Only
+     * possible when connected through the proxy — returns whether the channel was ready to carry it so callers can
+     * fall back (whisper / HTTP). {@code pearlId} blank = the requester's default pearl.
+     */
+    public static boolean sendPearlPull(String pearlId) {
+        if (!ClientPlayNetworking.canSend(BridgePayload.TYPE)) return false;
+        send(BridgeProtocol.encodePearlPull(pearlId == null ? "" : pearlId));
+        return true;
     }
 
     private static void send(byte[] bytes) {

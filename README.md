@@ -29,7 +29,12 @@ format (kept byte-identical on both sides).
 
 - `/proxybridge status` (alias `/pb`) — proxy detected? channel ready? waypoint count.
 - `/proxybridge swap` — send `/swap` to the connected proxy.
-- `/proxybridge pull` — pull your pearl from the connected proxy (`pearlplus load <you> <you>`).
+- `/proxybridge pull` — pull **your own** pearl, instantly, from your **default bot** (the sole registered bot, or one
+  set with `/pb bots default <id>`). Picks the best transport automatically: the `pearl/pull` plugin **channel** if
+  you're connected *through* that proxy (no token needed), otherwise the bot's **HTTP API** (`pearlpull` — self-scoped,
+  gated by your token's `pearl.pull`). The HTTP path is what makes this work **for players out in the world** — it hits
+  the bot directly, bypassing 2b2t chat. Also a **"Pull my pearl" keybind** (Controls → ProxyBridge, unbound by
+  default), and `/pb bridgepull <true|false>` toggles preferring the channel.
 - `/proxybridge cmd <command…>` — send any command to the connected proxy.
 - `/proxybridge hud <true|false>` / `boxes <true|false>` — toggle the built-in overlay.
 - `/proxybridge xaero <true|false>` — mirror waypoints into Xaero's Minimap (a "ProxyBridge" set).
@@ -42,10 +47,11 @@ You pull from **one** bot at a time.
 
 - `/pb bots add <id> <url> <token>` — register a bot (quote the url/token, e.g. `"1.2.3.4:7890"`).
 - `/pb bots list` / `/pb bots del <id>`
+- `/pb bots default <id>` — which bot `/pb pull` (no id) and the keybind target (auto when you have just one).
 - `/pb bots ign <id> <ign>` — set the bot's in-game name (used by the whisper intercept below).
-- `/pb bots pearlid <id> <pearlId>` — set the pearl id for a bot (default: your username).
-- `/pb pull <id>` — pull your pearl from that bot (`pearlplus load <you> <pearlId>`).
-- `/pb bots cmd <id> <command…>` — run any command on that bot.
+- `/pb bots pearlid <id> <pearlId>` — pin a specific pearl id (blank = your default pearl, resolved on the bot).
+- `/pb pull <id>` — pull your pearl from that bot over its API (self-scoped `pearlpull`).
+- `/pb bots cmd <id> <command…>` — run any command on that bot (as your token's role).
 
 Requires the target bot to run a proxy that exposes the ZenithProxy-style HTTP command API authorized by the shared
 token. AquariusProxy ships this as the RBAC **command API** (`perms api on`, localhost-bound by default — expose it
@@ -60,6 +66,10 @@ mute doesn't matter (and the bot's RBAC role decides what your command is allowe
 - `/w <bot-ign> <command…>` (also `msg`/`tell`/`whisper`/`m`) — if `<bot-ign>` matches a registered bot's IGN
   (set with `/pb bots ign`), the command is sent to its API; a local line confirms the reroute. Whispers to real
   players are untouched.
+- **Pearl-pull fast path:** a `/w <bot-ign> load [id]` whisper is sent over the backend instead of in-game chat
+  whenever `bridgePull` is on — the **instant plugin channel** when you're connected through that proxy, otherwise
+  the bot's HTTP API (`pearlpull`, self-scoped). This is independent of the muted-intercept toggle; if no backend is
+  ready the whisper just passes through as a normal in-game pull.
 - `/pb whisper <true|false>` — toggle the intercept (default on).
 
 ### In-game RBAC admin screen

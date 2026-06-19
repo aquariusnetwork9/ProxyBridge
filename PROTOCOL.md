@@ -51,6 +51,7 @@ int    ttlTicks    // 0 = no expiry (group sync controls lifetime)
 | `wp/remove`  | proxy → client | `String group, String id` |
 | `wp/clear`   | proxy → client | `String group` |
 | `cmd/invoke` | client → proxy | `String name, String args` — run a proxy command (allow-listed proxy-side) |
+| `pearl/pull` | client → proxy | `String pearlId` (empty = default) — pull the **connected player's own** pearl; self-scoped, gated by the proxy's RBAC `pearl.pull`; feedback returns as a `toast` |
 | `toast`      | proxy → client | `String message` |
 
 ## Live behaviour
@@ -64,3 +65,11 @@ disappears on the client — no diffing or explicit removal needed.
 For commands the mod can also simply send an **unsigned chat command** (`/swap`, `/pearlplus pull`, …) which the
 proxy parses normally — that's what `/proxybridge swap|pull|cmd` use. `cmd/invoke` over this channel is the
 alternative in-band path (subject to the proxy's `invokeAllowList`).
+
+### Instant pearl pull (`pearl/pull`)
+
+`/pb pull`, the **Pull my pearl** keybind, and the `/w <bot> load [id]` whisper fast-path send `pearl/pull` over
+this channel when it's ready (`config.bridgePull`, default on). The proxy resolves the **connected session's** RBAC
+subject and loads *that player's own* pearl — instant (no chat round-trip) and **no token needed** (the session is
+already authenticated). When the channel isn't ready (you're not connected through the proxy), those fall back to
+the bot's HTTP API (`pearlpull` — same self-scoped, `pearl.pull`-gated command) or a normal in-game whisper.
