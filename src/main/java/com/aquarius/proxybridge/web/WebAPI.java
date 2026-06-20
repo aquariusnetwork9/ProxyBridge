@@ -37,6 +37,27 @@ public class WebAPI {
         }
     }
 
+    /**
+     * Report the player's live position to a bot's {@code POST /position} endpoint (token-authorized; the proxy
+     * attributes it to the token's UUID). Fire-and-forget — the response body is discarded. Lets the bot's
+     * WhisperControl {@code come}/{@code follow} target the player out of the bot's render distance.
+     */
+    public void reportPosition(double x, double y, double z, String dimension, String ip, String token)
+            throws IOException, InterruptedException {
+        String json = gson.toJson(new PositionRequest(x, y, z, dimension));
+        try (var client = buildHttpClient()) {
+            String url = "";
+            if (!(ip.startsWith("http://") || ip.startsWith("https://"))) {
+                url = "http://";
+            }
+            url += ip + "/position";
+            HttpRequest request = buildBaseRequest(url, token)
+                .POST(HttpRequest.BodyPublishers.ofString(json))
+                .build();
+            client.send(request, HttpResponse.BodyHandlers.discarding());
+        }
+    }
+
     protected HttpClient buildHttpClient() {
         return HttpClient.newBuilder()
             .followRedirects(HttpClient.Redirect.ALWAYS)

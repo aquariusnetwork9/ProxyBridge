@@ -47,6 +47,16 @@ public class Config {
     /** Command verbs treated as whispers for the intercept (matched case-insensitively, no leading slash). */
     public final ArrayList<String> whisperVerbs = new ArrayList<>(List.of("w", "msg", "tell", "whisper", "m"));
 
+    /**
+     * Report your live position to your default bot's HTTP API ({@code POST /position}) so its WhisperControl can
+     * {@code come}/{@code follow} you even when you're far outside the bot's render distance. <b>Off by default</b> —
+     * it tells the bot's owner where you are. Needs a registered bot with a url + token (and the bot owner must enable
+     * {@code perms api} + grant your token a role).
+     */
+    public boolean reportPosition = false;
+    /** How often (in client ticks) to send a position report while {@link #reportPosition} is on; 20 = ~once/second. */
+    public int reportPositionIntervalTicks = 20;
+
     /** Remote pearl bots the player has access to (each gated by the owner-supplied token). */
     public final ArrayList<PearlBot> bots = new ArrayList<>();
 

@@ -25,6 +25,8 @@ import java.util.concurrent.ForkJoinPool;
 
 import static com.mojang.brigadier.arguments.BoolArgumentType.bool;
 import static com.mojang.brigadier.arguments.BoolArgumentType.getBool;
+import static com.mojang.brigadier.arguments.IntegerArgumentType.getInteger;
+import static com.mojang.brigadier.arguments.IntegerArgumentType.integer;
 import static com.mojang.brigadier.arguments.StringArgumentType.getString;
 import static com.mojang.brigadier.arguments.StringArgumentType.greedyString;
 import static com.mojang.brigadier.arguments.StringArgumentType.string;
@@ -75,6 +77,7 @@ public class ProxyBridgeMod implements ClientModInitializer {
         WaypointRenderer.init();
         com.aquarius.proxybridge.xaero.XaeroWaypointSync.init();
         com.aquarius.proxybridge.feature.WhisperInterceptor.init();
+        com.aquarius.proxybridge.feature.PositionReporter.init();
         registerCommands();
         registerKeybinds();
         LOG.info("ProxyBridge initialized");
@@ -247,6 +250,27 @@ public class ProxyBridgeMod implements ClientModInitializer {
                         + config.bridgePull + " — covers /pb pull, the pull keybind, and the /w <bot> load fast-path"));
                     return 1;
                 })))
+                .then(literal("reportpos")
+                    .then(argument("enabled", bool()).executes(c -> {
+                        config.reportPosition = getBool(c, "enabled");
+                        config.save();
+                        Config.PearlBot b = defaultBot();
+                        String tail = !config.reportPosition ? ""
+                            : (b == null ? " — but no default bot is set (/pb bots add <id> <url> <token>, then /pb bots default <id>)"
+                                         : " → " + b.id + " every " + config.reportPositionIntervalTicks + " ticks");
+                        c.getSource().sendFeedback(Component.literal(
+                            "Position reporting (POST /position so the bot can come/follow you out of range): "
+                                + config.reportPosition + tail));
+                        return 1;
+                    }))
+                    .then(literal("interval").then(argument("ticks", integer(1)).executes(c -> {
+                        config.reportPositionIntervalTicks = getInteger(c, "ticks");
+                        config.save();
+                        c.getSource().sendFeedback(Component.literal("Position report interval = "
+                            + config.reportPositionIntervalTicks + " ticks (~"
+                            + String.format("%.1f", config.reportPositionIntervalTicks / 20.0) + "s)"));
+                        return 1;
+                    }))))
                 .then(literal("admin")
                     .executes(c -> openAdmin(c.getSource(), null))
                     .then(argument("bot", word()).executes(c -> openAdmin(c.getSource(), getString(c, "bot"))))));
@@ -315,7 +339,7 @@ public class ProxyBridgeMod implements ClientModInitializer {
     }
 
     /** Target for {@code /pb pull} (no id) + the keybind: the configured default bot, or the sole registered bot. */
-    private static Config.PearlBot defaultBot() {
+    public static Config.PearlBot defaultBot() {
         if (config.bots.isEmpty()) return null;
         if (config.defaultBotId != null && !config.defaultBotId.isBlank()) {
             Config.PearlBot b = findBot(config.defaultBotId);
