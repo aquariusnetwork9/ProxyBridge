@@ -12,6 +12,11 @@ half of a generic, bidirectional bridge:
 Based on [rfresh2/ZenithProxyMod](https://github.com/rfresh2/ZenithProxyMod) (1.21.4 branch) — same build setup,
 Mojang + Parchment mappings, and the proven `sendUnsignedCommand` control path.
 
+> **First time? Read [SETUP.md](SETUP.md).** If `/pb status` says `proxy: false, channel: not ready`, that's
+> almost always (1) the Bridge module is off on the proxy (`bridge on`) and/or (2) your Minecraft client isn't
+> connected *through* the proxy. The IP+token you enter in the mod is a **separate** feature (remote HTTP
+> pearl-pull) and does **not** connect the bridge.
+
 ## How it works
 
 ```
