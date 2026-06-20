@@ -58,7 +58,7 @@ public final class WhisperInterceptor {
         if (words[0].equalsIgnoreCase("goto")) {
             if (hasApi(bot)) {
                 feedback("goto → " + bot.id + " over its API (off-chat)");
-                ProxyBridgeMod.runRemoteToChat(bot, message);
+                ProxyBridgeMod.runRemoteToChat(bot, "wc whisper " + message);
             } else {
                 feedback("⛔ goto blocked — no API token for " + bot.id + "; coords were NOT sent to chat. "
                     + "Add one with /pb bots add " + bot.id + " <url> <token>.");
@@ -85,10 +85,12 @@ public final class WhisperInterceptor {
             return true;                                           // no backend ready — let the whisper through
         }
 
-        // Muted-safe generic command reroute over the HTTP API (opt-in).
+        // Reroute the whisper as a `wc whisper <message>` API command so WC verbs (protect, come, patrol, mine, stop)
+        // bypass 2b2t's chat spam filter — they never hit the server. Opt-in via interceptWhispers.
         if (!config.interceptWhispers) return true;
-        feedback("muted-safe: rerouting to " + bot.id + " via API → /" + message);
-        ProxyBridgeMod.runRemoteToChat(bot, message);
+        if (!hasApi(bot)) return true;                            // no token — can't reroute, let it through
+        feedback("→ " + bot.id + " via API (wc whisper " + words[0] + ")");
+        ProxyBridgeMod.runRemoteToChat(bot, "wc whisper " + message);
         return false;                                             // cancel the in-game whisper
     }
 
