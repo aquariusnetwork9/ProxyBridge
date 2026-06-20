@@ -50,11 +50,26 @@ public final class WhisperInterceptor {
         if (message.startsWith("/")) message = message.substring(1).strip();   // tolerate "/w bot /pearlplus load …"
         if (message.isEmpty()) return true;
 
+        String[] words = message.split("\\s+");
+
+        // goto is coordinate-bearing and must NEVER reach Minecraft chat. Capture it unconditionally (independent of
+        // interceptWhispers — this is a privacy guarantee, not a mute bypass): route it over the bot's HTTP API if one
+        // is configured, otherwise block the whisper outright so the coords are never sent. Either way, cancel it.
+        if (words[0].equalsIgnoreCase("goto")) {
+            if (hasApi(bot)) {
+                feedback("goto → " + bot.id + " over its API (off-chat)");
+                ProxyBridgeMod.runRemoteToChat(bot, message);
+            } else {
+                feedback("⛔ goto blocked — no API token for " + bot.id + "; coords were NOT sent to chat. "
+                    + "Add one with /pb bots add " + bot.id + " <url> <token>.");
+            }
+            return false;
+        }
+
         // Pearl-pull fast path: "<bot> load [id]" routed over the backend instead of in-game chat. Independent of
         // interceptWhispers (it's a speed-up, not a mute bypass): the instant plugin channel first when connected
         // through the proxy, else the bot's HTTP API ("pearlpull" — self-scoped, pearl.pull-gated). Falls through to
         // a normal in-game whisper if neither backend is available.
-        String[] words = message.split("\\s+");
         if (config.bridgePull && words[0].equalsIgnoreCase("load")) {
             String pearlId = words.length >= 2 ? words[1] : "";
             if (BridgeNetworking.sendPearlPull(pearlId)) {

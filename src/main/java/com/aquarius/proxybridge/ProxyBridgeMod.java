@@ -218,6 +218,11 @@ public class ProxyBridgeMod implements ClientModInitializer {
                     c.getSource().sendFeedback(Component.literal("Sent: /" + command));
                     return 1;
                 })))
+                .then(literal("goto")
+                    .then(argument("x", integer())
+                    .then(argument("y", integer())
+                    .then(argument("z", integer()).executes(c -> gotoSecure(c.getSource(),
+                        getInteger(c, "x"), getInteger(c, "y"), getInteger(c, "z")))))))
                 .then(literal("hud").then(argument("enabled", bool()).executes(c -> {
                     config.renderHud = getBool(c, "enabled");
                     config.save();
@@ -350,6 +355,24 @@ public class ProxyBridgeMod implements ClientModInitializer {
 
     private static boolean hasApi(Config.PearlBot bot) {
         return bot != null && bot.url != null && !bot.url.isBlank() && bot.token != null && !bot.token.isBlank();
+    }
+
+    /**
+     * Send the bot to coordinates over its HTTP API <b>only</b> ({@code wc goto x y z}) — the coordinates are NEVER
+     * written to Minecraft chat (public, whisper, or otherwise). Requires a default bot with a url + token; if none is
+     * configured this refuses rather than falling back to chat, so a base location can never leak.
+     */
+    private static int gotoSecure(FabricClientCommandSource source, int x, int y, int z) {
+        Config.PearlBot bot = defaultBot();
+        if (bot == null || !hasApi(bot)) {
+            source.sendError(Component.literal(
+                "goto needs a bot with an HTTP API token — coordinates are NEVER sent over chat. "
+                    + "Register one with /pb bots add <id> <url> <token>, then /pb bots default <id>."));
+            return 0;
+        }
+        source.sendFeedback(Component.literal("Sending goto to " + bot.id + " over its API (off-chat)…"));
+        runRemote(source, bot, "wc goto " + x + " " + y + " " + z);
+        return 1;
     }
 
     private static void chat(Minecraft client, String msg) {
